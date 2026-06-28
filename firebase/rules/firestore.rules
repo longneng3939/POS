@@ -1,0 +1,28 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Business-scoped collections.
+    match /businesses/{businessId} {
+      // Products: any authenticated user under this business can read or update
+      // the catalog. For a private APK POS all authenticated devices are trusted.
+      match /products/{productId} {
+        allow read, write: if isAuthenticated();
+      }
+
+      // Transactions: readable by any authenticated device in the business, but
+      // writable only by the device that created the record. The deviceId field
+      // must match the anonymous auth UID of the calling device.
+      match /transactions/{transactionId} {
+        allow read: if isAuthenticated();
+        allow create: if isAuthenticated()
+          && request.resource.data.deviceId == request.auth.uid;
+        allow update, delete: if isAuthenticated()
+          && resource.data.deviceId == request.auth.uid;
+      }
+    }
+  }
+}
